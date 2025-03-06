@@ -13,6 +13,7 @@ const observer = new MutationObserver((mutations) => {
 function injectAnalysisButtons(container) {
   // 查找所有微博内容区域
   const posts = container.querySelectorAll('.Feed_wrap_3v9LH:not([data-analysis-injected])');
+  console.log('[Weibo Reader] Found posts:', posts.length);
 
   posts.forEach((post) => {
     // 标记已处理
@@ -20,11 +21,14 @@ function injectAnalysisButtons(container) {
 
     // 获取互动数据
     const contentText = post.querySelector('.detail_wbtext_4CRf9')?.innerText || '';
+    console.log('[Weibo Reader] Found post content:', contentText.slice(0, 50) + '...');
+
     const metrics = {
       reposts: post.querySelector('.woo-font--retweet')?.closest('.toolbar_wrap_np6Ug')?.querySelector('.toolbar_num_JXZul')?.innerText.trim() || '0',
       comments: post.querySelector('.woo-font--comment')?.closest('.toolbar_wrap_np6Ug')?.querySelector('.toolbar_num_JXZul')?.innerText.trim() || '0',
       likes: post.querySelector('.woo-like-count')?.innerText.trim() || '0'
     };
+    console.log('[Weibo Reader] Extracted metrics:', metrics);
 
     // 创建分析按钮
     const button = document.createElement('button');
@@ -48,6 +52,7 @@ function injectAnalysisButtons(container) {
         // 从storage获取设置
         const settings = await chrome.storage.local.get(['promptTemplate']);
         const prompt = (settings.promptTemplate || '请分析这条微博的情感倾向，并给出3个关键点').replace('{text}', content);
+        console.log('[Weibo Reader] Analyzing post with prompt:', prompt);
 
         // 发送消息给background script处理API调用
         const response = await chrome.runtime.sendMessage({
@@ -70,8 +75,10 @@ function injectAnalysisButtons(container) {
           </div>
         `;
         resultContainer.style.display = 'block';
+        console.log('[Weibo Reader] Analysis completed and displayed');
 
       } catch (error) {
+        console.error('[Weibo Reader] Analysis failed:', error);
         resultContainer.innerHTML = `
           <div class="analysis-error">
             分析失败: ${error.message}
@@ -94,7 +101,12 @@ function injectAnalysisButtons(container) {
         buttonWrapper.appendChild(button);
         toolbarLeft.appendChild(buttonWrapper);
         footer.appendChild(resultContainer);
+        console.log('[Weibo Reader] Successfully injected analysis button and container');
+      } else {
+        console.warn('[Weibo Reader] Could not find toolbar_left_2vlsY');
       }
+    } else {
+      console.warn('[Weibo Reader] Could not find footer element');
     }
   });
 }

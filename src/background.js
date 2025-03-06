@@ -20,7 +20,7 @@ async function handleAnalysis(request) {
   }
 
   // 获取用户选择的模型
-  const { modelName = 'mistral' } = await chrome.storage.local.get(['modelName']);
+  const { modelName = 'gemma2:2b' } = await chrome.storage.local.get(['modelName']);
 
   try {
     const response = await fetch(API_ENDPOINT, {
