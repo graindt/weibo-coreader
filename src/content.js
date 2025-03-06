@@ -12,11 +12,19 @@ const observer = new MutationObserver((mutations) => {
 // 注入分析按钮的主要函数
 function injectAnalysisButtons(container) {
   // 查找所有微博内容区域
-  const posts = container.querySelectorAll('.weibo-text:not([data-analysis-injected])');
+  const posts = container.querySelectorAll('.Feed_wrap_3v9LH:not([data-analysis-injected])');
 
   posts.forEach((post) => {
     // 标记已处理
     post.setAttribute('data-analysis-injected', 'true');
+
+    // 获取互动数据
+    const contentText = post.querySelector('.detail_wbtext_4CRf9')?.innerText || '';
+    const metrics = {
+      reposts: post.querySelector('.woo-font--retweet')?.closest('.toolbar_wrap_np6Ug')?.querySelector('.toolbar_num_JXZul')?.innerText.trim() || '0',
+      comments: post.querySelector('.woo-font--comment')?.closest('.toolbar_wrap_np6Ug')?.querySelector('.toolbar_num_JXZul')?.innerText.trim() || '0',
+      likes: post.querySelector('.woo-like-count')?.innerText.trim() || '0'
+    };
 
     // 创建分析按钮
     const button = document.createElement('button');
@@ -35,7 +43,7 @@ function injectAnalysisButtons(container) {
         button.innerText = '分析中...';
 
         // 获取微博文本
-        const content = post.innerText;
+        const content = contentText;
 
         // 从storage获取设置
         const settings = await chrome.storage.local.get(['promptTemplate']);
@@ -51,7 +59,14 @@ function injectAnalysisButtons(container) {
         // 显示结果
         resultContainer.innerHTML = `
           <div class="analysis-content">
-            ${response.result.replace(/\n/g, '<br>')}
+            <div class="metrics-container">
+              <span>转发: ${metrics.reposts}</span>
+              <span>评论: ${metrics.comments}</span>
+              <span>点赞: ${metrics.likes}</span>
+            </div>
+            <div class="analysis-text">
+              ${response.result.replace(/\n/g, '<br>')}
+            </div>
           </div>
         `;
         resultContainer.style.display = 'block';
@@ -70,9 +85,17 @@ function injectAnalysisButtons(container) {
     });
 
     // 插入按钮和结果容器
-    const actionBar = post.closest('.weibo-main').querySelector('.weibo-opt');
-    actionBar.appendChild(button);
-    actionBar.appendChild(resultContainer);
+    const footer = post.querySelector('footer');
+    if (footer) {
+      const toolbarLeft = footer.querySelector('.toolbar_left_2vlsY');
+      if (toolbarLeft) {
+        const buttonWrapper = document.createElement('div');
+        buttonWrapper.className = 'woo-box-item-flex toolbar_item_1ky_D';
+        buttonWrapper.appendChild(button);
+        toolbarLeft.appendChild(buttonWrapper);
+        footer.appendChild(resultContainer);
+      }
+    }
   });
 }
 
