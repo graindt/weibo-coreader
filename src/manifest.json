@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Weibo Analysis Assistant",
+  "version": "1.0",
+  "description": "使用AI模型分析微博内容的Chrome扩展",
+  "permissions": [
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://weibo.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "微博分析设置"
+  },
+  "content_scripts": [{
+    "matches": ["https://weibo.com/*"],
+    "js": ["content.js"],
+    "css": ["styles.css"]
+  }],
+  "background": {
+    "service_worker": "background.js"
+  }
+}
