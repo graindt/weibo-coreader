@@ -1,18 +1,24 @@
 .weibo-analysis-btn {
   margin-left: 16px;
-  padding: 0;
-  border: none;
-  background: none;
-  color: #939393;
+  padding: 6px 12px;
+  border: 1px solid #e6e6e6;
+  background: #fff;
+  color: #666;
   cursor: pointer;
   font-size: 14px;
-  transition: color 0.3s ease;
+  transition: all 0.3s ease;
   display: flex;
   align-items: center;
+  border-radius: 4px;
+  position: relative;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .weibo-analysis-btn:hover {
   color: #ff8200;
+  border-color: #ff8200;
+  background: #fff8f0;
 }
 
 .weibo-analysis-btn:disabled {
