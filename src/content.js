@@ -92,15 +92,29 @@ function injectAnalysisButtons(container) {
   const posts = container.querySelectorAll('.Feed_wrap_3v9LH:not([data-analysis-injected])');
   console.log('[Weibo Reader] Found posts:', posts.length);
 
-  posts.forEach((post) => {
+  posts.forEach(async (post) => {
     // 标记已处理
     post.setAttribute('data-analysis-injected', 'true');
 
+    // 获取完整微博内容的函数
+    async function getFullContent(container) {
+      // 检查是否有展开按钮
+      const expandButton = container.querySelector('span.expand');
+      if (expandButton && expandButton.textContent === '展开') {
+        // 点击展开按钮
+        expandButton.click();
+        // 等待内容更新
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      return container.querySelector('.detail_wbtext_4CRf9')?.innerText || '';
+    }
+
     // 获取原微博内容
-    const originalContent = post.querySelector('.detail_wbtext_4CRf9')?.innerText || '';
+    const originalContent = await getFullContent(post);
 
     // 获取转发微博内容
-    const retweetContent = post.querySelector('.Feed_retweet_JqZJb .detail_wbtext_4CRf9')?.innerText || '';
+    const retweetContainer = post.querySelector('.Feed_retweet_JqZJb');
+    const retweetContent = retweetContainer ? await getFullContent(retweetContainer) : '';
 
     // 合并内容
     const contentText = retweetContent ?
