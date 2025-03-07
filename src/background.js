@@ -11,8 +11,8 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   }
 
   if (request.type === 'analyzeWeibo') {
-    console.log('[Background] 开始处理分析请求');
-    handleAnalysis(request)
+    console.log('[Background] 开始处理分析请求, sender:', sender);
+    handleAnalysis({ ...request, tabId: sender.tab.id })
       .then(result => {
         console.log('[Background] 分析完成:', result);
         sendResponse({ result: result.response });
@@ -30,9 +30,10 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
 
 // 处理微博分析请求
 async function handleAnalysis(request) {
-  const { content, prompt } = request;
+  const { content, prompt, tabId } = request;
   console.log('[Background] 分析内容:', content?.slice(0, 100) + '...');
   console.log('[Background] 使用提示词:', prompt);
+  console.log('[Background] Tab ID:', tabId);
 
   if (!content) {
     console.error('[Background] 错误: 未能获取微博内容');
@@ -47,7 +48,7 @@ async function handleAnalysis(request) {
     const requestBody = {
       model: modelName,
       prompt: `${prompt}\n\n微博内容如下: ${content}`,
-      stream: false
+      stream: true
     };
     console.log('[Background] 发送API请求:', {
       endpoint: API_ENDPOINT,
@@ -55,59 +56,60 @@ async function handleAnalysis(request) {
       promptLength: requestBody.prompt.length
     });
 
-    let response;
-    try {
-      console.log('[Background] 尝试连接Ollama服务器...');
-      response = await fetch(API_ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'POST',
-          'Access-Control-Allow-Headers': 'Content-Type'
-        },
-        body: JSON.stringify(requestBody)
-      });
-    } catch (networkError) {
-      console.error('[Background] 网络错误:', {
-        name: networkError.name,
-        message: networkError.message,
-        type: networkError.type,
-        cause: networkError.cause
-      });
-      throw new Error('无法连接到Ollama服务器。请确保:\n1. Ollama正在运行\n2. 使用 OLLAMA_ORIGINS="*" ollama serve 命令启动Ollama以允许跨域请求');
-    }
+    console.log('[Background] 尝试连接Ollama服务器...');
+    const response = await fetch(API_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST',
+        'Access-Control-Allow-Headers': 'Content-Type'
+      },
+      body: JSON.stringify(requestBody)
+    });
 
     console.log('[Background] API响应状态:', response.status, response.statusText);
 
     if (!response.ok) {
-      console.error('[Background] API请求失败:', response.status, response.statusText);
-      let errorMessage = '请求失败';
-      try {
-        const errorData = await response.json();
-        errorMessage = errorData.message || errorMessage;
-        console.error('[Background] API错误详情:', errorData);
-      } catch (e) {
-        console.error('[Background] 无法解析错误响应:', e);
-      }
-      throw new Error(errorMessage);
+      throw new Error('API请求失败: ' + response.statusText);
     }
 
-    const data = await response.json();
-    console.log('[Background] API返回数据:', {
-      hasResponse: !!data.response,
-      responseLength: data.response?.length ?? 0,
-      fullData: data
-    });
+    const reader = response.body.getReader();
+    let fullResponse = '';
 
-    // Ollama API返回格式处理
-    if (!data.response) {
-      console.error('[Background] API返回格式错误:', data);
-      throw new Error('API返回格式错误');
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        // 将 Uint8Array 转换为文本
+        const text = new TextDecoder().decode(value);
+        const lines = text.split('\n');
+
+        for (const line of lines) {
+          if (line.trim()) {
+            try {
+              const json = JSON.parse(line);
+              if (json.response) {
+                fullResponse += json.response;
+                // 发送部分响应到content script
+                chrome.tabs.sendMessage(tabId, {
+                  type: 'streamResponse',
+                  content: json.response
+                });
+              }
+            } catch (e) {
+              console.warn('[Background] 解析流数据失败:', e);
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
     }
 
     return {
-      response: data.response
+      response: fullResponse
     };
 
   } catch (error) {

@@ -76,6 +76,22 @@ function injectAnalysisButtons(container) {
         console.log('[Weibo Reader] Analyzing post content:', contentText);
         console.log('[Weibo Reader] Analyzing post with prompt:', prompt);
 
+        // 清空并显示结果容器
+        contentDiv.innerHTML = '';
+        container.classList.remove('hidden');
+
+        // 设置流式响应监听器
+        const streamListener = (message) => {
+          if (message.type === 'streamResponse') {
+            contentDiv.innerHTML += message.content.replace(/\n/g, '<br>');
+            // 自动滚动到底部
+            contentDiv.scrollTop = contentDiv.scrollHeight;
+          }
+        };
+
+        // 添加消息监听
+        chrome.runtime.onMessage.addListener(streamListener);
+
         // 发送消息给background script处理API调用
         console.log('[Content] 发送分析请求给background:', {
           type: 'analyzeWeibo',
@@ -83,26 +99,24 @@ function injectAnalysisButtons(container) {
           prompt
         });
 
-        const response = await chrome.runtime.sendMessage({
-          type: 'analyzeWeibo',
-          content: contentText,
-          prompt
-        }).catch(error => {
-          console.error('[Content] 发送消息失败:', error);
-          throw error;
-        });
+        try {
+          const response = await chrome.runtime.sendMessage({
+            type: 'analyzeWeibo',
+            content: contentText,
+            prompt
+          });
 
-        console.log('[Content] 收到background响应:', response);
+          console.log('[Content] 收到background最终响应:', response);
 
-        // 验证响应
-        if (!response || !response.result) {
-          throw new Error('无效的分析结果');
+          if (!response || !response.result) {
+            throw new Error('无效的分析结果');
+          }
+
+          console.log('[Weibo Reader] Analysis completed');
+        } finally {
+          // 移除消息监听
+          chrome.runtime.onMessage.removeListener(streamListener);
         }
-
-        // 显示结果
-        contentDiv.innerHTML = response.result.replace(/\n/g, '<br>');
-        container.classList.remove('hidden');
-        console.log('[Weibo Reader] Analysis completed and displayed');
 
       } catch (error) {
         console.error('[Weibo Reader] Analysis failed:', error);
