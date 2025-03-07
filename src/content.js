@@ -43,53 +43,88 @@ function debounce(func, wait) {
   };
 }
 
-// 检查节点是否相关
+// 检查节点是否为微博内容或包含微博内容
 function isRelevantNode(node) {
-  return (
-    node.classList?.contains('Feed_wrap_3v9LH') ||
-    node.querySelector?.('.Feed_wrap_3v9LH')
+  // 检查节点类型
+  if (node.nodeType !== Node.ELEMENT_NODE) return false;
+
+  // 直接检查常见的微博容器类名
+  const relevantClasses = [
+    'Feed_wrap_3v9LH',
+    'Feed_body_3R1tW',
+    'Main_full_1dfQX',
+    'vue-recycle-scroller__item-view'
+  ];
+
+  for (const className of relevantClasses) {
+    if (node.classList?.contains(className) || node.querySelector?.(`.${className}`)) {
+      return true;
+    }
+  }
+
+  // 检查是否包含微博特征元素
+  return !!(
+    node.querySelector?.('.detail_wbtext_4CRf9') ||
+    node.querySelector?.('.Feed_retweet_JqZJb') ||
+    node.querySelector?.('.toolbar_left_2vlsY')
   );
 }
 
 // 使用 MutationObserver 监听微博内容变化
-const observer = new MutationObserver(
-  debounce((mutations) => {
-    const relevantMutations = mutations.filter(mutation => {
-      // 过滤掉属性变化
-      if (mutation.type !== 'childList') return false;
+const observer = new MutationObserver((mutations) => {
+  const nodesToProcess = new Set();
 
-      // 检查添加的节点是否包含相关内容
-      const hasRelevantAddedNodes = Array.from(mutation.addedNodes).some(node =>
-        node.nodeType === Node.ELEMENT_NODE && isRelevantNode(node)
-      );
-
-      return hasRelevantAddedNodes;
+  mutations.forEach(mutation => {
+    // 检查新增的节点
+    mutation.addedNodes.forEach(node => {
+      if (isRelevantNode(node)) {
+        nodesToProcess.add(node);
+      }
     });
 
-    if (relevantMutations.length === 0) return;
-
-    // 暂时断开观察器避免处理过程中触发新的mutations
-    observer.disconnect();
-
-    try {
-      relevantMutations.forEach(mutation => {
-        mutation.addedNodes.forEach(node => {
-          if (node.nodeType === Node.ELEMENT_NODE && isRelevantNode(node)) {
-            injectAnalysisButtons(node);
-          }
-        });
-      });
-    } finally {
-      // 重新连接观察器
-      startObserver();
+    // 检查目标节点及其子元素
+    if (isRelevantNode(mutation.target)) {
+      nodesToProcess.add(mutation.target);
     }
-  }, 100)
-);
+
+    // 检查目标节点的父级元素
+    let parent = mutation.target.parentElement;
+    while (parent) {
+      if (isRelevantNode(parent)) {
+        nodesToProcess.add(parent);
+        break;
+      }
+      parent = parent.parentElement;
+    }
+  });
+
+  // 处理收集到的所有相关节点
+  nodesToProcess.forEach(node => {
+    injectAnalysisButtons(node);
+  });
+});
 
 // 注入分析按钮的主要函数
 function injectAnalysisButtons(container) {
   // 查找所有微博内容区域
-  const posts = container.querySelectorAll('.Feed_wrap_3v9LH:not([data-analysis-injected])');
+  let posts = [];
+
+  // 首先查找所有常规微博
+  const regularPosts = container.querySelectorAll('.Feed_wrap_3v9LH:not([data-analysis-injected])');
+  posts.push(...Array.from(regularPosts));
+
+  // 如果容器本身是微博但未被处理，也将其加入
+  if (container.classList?.contains('Feed_wrap_3v9LH') && !container.hasAttribute('data-analysis-injected')) {
+    posts.push(container);
+  }
+
+  // 查找可能的其他微博容器类型
+  const alternativePosts = container.querySelectorAll('.Feed_body_3R1tW:not([data-analysis-injected])');
+  posts.push(...Array.from(alternativePosts));
+
+  // 去重
+  posts = Array.from(new Set(posts));
+
   console.log('[Weibo Reader] Found posts:', posts.length);
 
   posts.forEach(async (post) => {
