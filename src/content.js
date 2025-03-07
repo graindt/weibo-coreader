@@ -96,8 +96,17 @@ function injectAnalysisButtons(container) {
     // 标记已处理
     post.setAttribute('data-analysis-injected', 'true');
 
-    // 获取互动数据
-    const contentText = post.querySelector('.detail_wbtext_4CRf9')?.innerText || '';
+    // 获取原微博内容
+    const originalContent = post.querySelector('.detail_wbtext_4CRf9')?.innerText || '';
+
+    // 获取转发微博内容
+    const retweetContent = post.querySelector('.Feed_retweet_JqZJb .detail_wbtext_4CRf9')?.innerText || '';
+
+    // 合并内容
+    const contentText = retweetContent ?
+      `转发内容：\n${originalContent}\n\n原微博内容：\n${retweetContent}` :
+      originalContent;
+
     console.log('[Weibo Reader] Found post content:', contentText.slice(0, 50) + '...');
 
     // 创建分析按钮
@@ -187,20 +196,34 @@ function injectAnalysisButtons(container) {
     });
 
     // 插入按钮
-    const footer = post.querySelector('footer');
-    if (footer) {
-      const toolbarLeft = footer.querySelector('.toolbar_left_2vlsY');
-      if (toolbarLeft) {
+    const footers = post.querySelectorAll('footer');
+
+    if (footers.length > 0) {
+      // 选择最后一个footer
+      const footer = footers[footers.length - 1];
+      // 根据是否是转发微博选择不同的工具栏
+      const toolbar = footer.querySelector('.toolbar_left_2vlsY');
+      if (toolbar) {
+        // 找到所有现有的工具栏项
+        const existingButtons = toolbar.querySelectorAll('.toolbar_item_1ky_D');
+        const lastButton = existingButtons[existingButtons.length - 1];
+
         const buttonWrapper = document.createElement('div');
         buttonWrapper.className = 'woo-box-item-flex toolbar_item_1ky_D';
         buttonWrapper.appendChild(button);
-        toolbarLeft.appendChild(buttonWrapper);
+
+        // 在最后一个按钮之后插入
+        if (lastButton) {
+          lastButton.insertAdjacentElement('afterend', buttonWrapper);
+        } else {
+          toolbar.appendChild(buttonWrapper);
+        }
         console.log('[Weibo Reader] Successfully injected analysis button');
       } else {
-        console.warn('[Weibo Reader] Could not find toolbar_left_2vlsY');
+        console.warn('[Weibo Reader] Could not find toolbar');
       }
     } else {
-      console.warn('[Weibo Reader] Could not find footer element');
+      console.warn('[Weibo Reader] Could not find footer');
     }
   });
 }
