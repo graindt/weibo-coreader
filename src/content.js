@@ -30,16 +30,61 @@ function getFixedContainer() {
   return fixedContainer;
 }
 
+// 防抖函数
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+// 检查节点是否相关
+function isRelevantNode(node) {
+  return (
+    node.classList?.contains('Feed_wrap_3v9LH') ||
+    node.querySelector?.('.Feed_wrap_3v9LH')
+  );
+}
+
 // 使用 MutationObserver 监听微博内容变化
-const observer = new MutationObserver((mutations) => {
-  mutations.forEach((mutation) => {
-    mutation.addedNodes.forEach((node) => {
-      if (node.nodeType === Node.ELEMENT_NODE) {
-        injectAnalysisButtons(node);
-      }
+const observer = new MutationObserver(
+  debounce((mutations) => {
+    const relevantMutations = mutations.filter(mutation => {
+      // 过滤掉属性变化
+      if (mutation.type !== 'childList') return false;
+
+      // 检查添加的节点是否包含相关内容
+      const hasRelevantAddedNodes = Array.from(mutation.addedNodes).some(node =>
+        node.nodeType === Node.ELEMENT_NODE && isRelevantNode(node)
+      );
+
+      return hasRelevantAddedNodes;
     });
-  });
-});
+
+    if (relevantMutations.length === 0) return;
+
+    // 暂时断开观察器避免处理过程中触发新的mutations
+    observer.disconnect();
+
+    try {
+      relevantMutations.forEach(mutation => {
+        mutation.addedNodes.forEach(node => {
+          if (node.nodeType === Node.ELEMENT_NODE && isRelevantNode(node)) {
+            injectAnalysisButtons(node);
+          }
+        });
+      });
+    } finally {
+      // 重新连接观察器
+      startObserver();
+    }
+  }, 100)
+);
 
 // 注入分析按钮的主要函数
 function injectAnalysisButtons(container) {
@@ -70,9 +115,17 @@ function injectAnalysisButtons(container) {
         const container = getFixedContainer();
         const contentDiv = container.querySelector('.analysis-text');
 
-        // 从storage获取设置
-        const settings = await chrome.storage.local.get(['promptTemplate']);
-        const prompt = (settings.promptTemplate || '请分析这条微博的事实和观点');
+        // 从storage获取设置并添加错误处理
+        let prompt = '请分析这条微博的事实和观点';
+        try {
+          const settings = await chrome.storage.local.get(['promptTemplate']);
+          if (settings && settings.promptTemplate) {
+            prompt = settings.promptTemplate;
+          }
+        } catch (error) {
+          console.warn('[Weibo Reader] Failed to get settings:', error);
+          // 继续使用默认prompt
+        }
         console.log('[Weibo Reader] Analyzing post content:', contentText);
         console.log('[Weibo Reader] Analyzing post with prompt:', prompt);
 
@@ -152,11 +205,26 @@ function injectAnalysisButtons(container) {
   });
 }
 
-// 启动观察器
-observer.observe(document.body, {
-  childList: true,
-  subtree: true
-});
+// 启动观察器函数
+function startObserver() {
+  // 找到主要内容容器
+  const mainContent = document.querySelector('.Main_full_1dfQX') || document.body;
 
+  observer.observe(mainContent, {
+    childList: true,
+    subtree: true
+  });
+}
+
+// 初始启动
+startObserver();
 // 初始处理现有内容
 injectAnalysisButtons(document.body);
+
+// 页面切换时重新初始化
+window.addEventListener('popstate', () => {
+  setTimeout(() => {
+    startObserver();
+    injectAnalysisButtons(document.body);
+  }, 500);
+});
