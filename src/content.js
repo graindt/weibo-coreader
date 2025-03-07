@@ -96,28 +96,21 @@ function injectAnalysisButtons(container) {
     // 标记已处理
     post.setAttribute('data-analysis-injected', 'true');
 
-    // 获取完整微博内容的函数
-    async function getFullContent(container) {
-      // 检查是否有展开按钮
-      const expandButton = container.querySelector('span.expand');
-      if (expandButton && expandButton.textContent === '展开') {
-        // 点击展开按钮
-        expandButton.click();
-        // 等待内容更新
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
+    // 获取指定容器中的微博文本
+    function getPostText(container) {
       return container.querySelector('.detail_wbtext_4CRf9')?.innerText || '';
     }
 
     // 获取原微博内容
-    const originalContent = await getFullContent(post);
+    const originalContent = getPostText(post);
 
     // 获取转发微博内容
-    const retweetContainer = post.querySelector('.Feed_retweet_JqZJb');
-    const retweetContent = retweetContainer ? await getFullContent(retweetContainer) : '';
+    const retweetContent = post.querySelector('.Feed_retweet_JqZJb') ?
+      getPostText(post.querySelector('.Feed_retweet_JqZJb')) :
+      '';
 
     // 合并内容
-    const contentText = retweetContent ?
+    let contentText = retweetContent ?
       `转发内容：\n${originalContent}\n\n原微博内容：\n${retweetContent}` :
       originalContent;
 
@@ -137,6 +130,29 @@ function injectAnalysisButtons(container) {
         // 获取固定容器
         const container = getFixedContainer();
         const contentDiv = container.querySelector('.analysis-text');
+
+        // 获取完整微博内容的函数
+        async function getFullContent(container) {
+          // 检查是否有展开按钮
+          const expandButton = container.querySelector('span.expand');
+          if (expandButton && expandButton.textContent === '展开') {
+            // 点击展开按钮
+            expandButton.click();
+            // 等待内容更新
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+          return container.querySelector('.detail_wbtext_4CRf9')?.innerText || '';
+        }
+
+        // 展开并获取完整内容
+        const fullOriginalContent = await getFullContent(post);
+        const retweetContainer = post.querySelector('.Feed_retweet_JqZJb');
+        const fullRetweetContent = retweetContainer ? await getFullContent(retweetContainer) : '';
+
+        // 更新contentText为完整内容
+        contentText = fullRetweetContent ?
+          `转发内容：\n${fullOriginalContent}\n\n原微博内容：\n${fullRetweetContent}` :
+          fullOriginalContent;
 
         // 从storage获取设置并添加错误处理
         let prompt = '请分析这条微博的事实和观点';
