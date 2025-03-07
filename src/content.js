@@ -51,24 +51,36 @@ function injectAnalysisButtons(container) {
 
         // 从storage获取设置
         const settings = await chrome.storage.local.get(['promptTemplate']);
-        const prompt = (settings.promptTemplate || '请分析这条微博的情感倾向，并给出3个关键点').replace('{text}', content);
+        const prompt = (settings.promptTemplate || '请分析这条微博的事实和观点');
+        console.log('[Weibo Reader] Analyzing post content:', content);
         console.log('[Weibo Reader] Analyzing post with prompt:', prompt);
 
         // 发送消息给background script处理API调用
+        console.log('[Content] 发送分析请求给background:', {
+          type: 'analyzeWeibo',
+          contentLength: content?.length,
+          prompt
+        });
+
         const response = await chrome.runtime.sendMessage({
           type: 'analyzeWeibo',
           content,
           prompt
+        }).catch(error => {
+          console.error('[Content] 发送消息失败:', error);
+          throw error;
         });
+
+        console.log('[Content] 收到background响应:', response);
+
+        // 验证响应
+        if (!response || !response.result) {
+          throw new Error('无效的分析结果');
+        }
 
         // 显示结果
         resultContainer.innerHTML = `
           <div class="analysis-content">
-            <div class="metrics-container">
-              <span>转发: ${metrics.reposts}</span>
-              <span>评论: ${metrics.comments}</span>
-              <span>点赞: ${metrics.likes}</span>
-            </div>
             <div class="analysis-text">
               ${response.result.replace(/\n/g, '<br>')}
             </div>

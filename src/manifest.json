@@ -5,10 +5,12 @@
   "description": "使用AI模型分析微博内容的Chrome扩展",
   "permissions": [
     "storage",
-    "scripting"
+    "scripting",
+    "tabs"
   ],
   "host_permissions": [
-    "https://weibo.com/*"
+    "https://weibo.com/*",
+    "http://localhost:11434/*"
   ],
   "action": {
     "default_popup": "popup.html",
