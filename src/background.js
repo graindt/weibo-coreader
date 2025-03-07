@@ -46,7 +46,7 @@ async function handleAnalysis(request) {
   try {
     const requestBody = {
       model: modelName,
-      prompt: `You are a professional social media content analyzer.\n\nAnalysis request: ${prompt}\n\nWeibo content: ${content}`,
+      prompt: `${prompt}\n\n微博内容如下: ${content}`,
       stream: false
     };
     console.log('[Background] 发送API请求:', {

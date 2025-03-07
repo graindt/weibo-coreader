@@ -55,3 +55,46 @@
 .analysis-error {
   color: #ff4d4f;
 }
+
+.fixed-analysis-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 300px;
+  max-height: 80vh;
+  overflow-y: auto;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 9999;
+  padding: 16px;
+  border: 1px solid #e6e6e6;
+}
+
+.fixed-analysis-container.hidden {
+  display: none;
+}
+
+.fixed-analysis-header {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e6e6e6;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.close-analysis-btn {
+  cursor: pointer;
+  padding: 4px 8px;
+  border: none;
+  background: none;
+  color: #666;
+  font-size: 14px;
+}
+
+.close-analysis-btn:hover {
+  color: #ff8200;
+}

@@ -1,3 +1,35 @@
+// 创建固定结果容器
+function createFixedContainer() {
+  const container = document.createElement('div');
+  container.className = 'fixed-analysis-container hidden';
+  container.innerHTML = `
+    <div class="fixed-analysis-header">
+      <span>微博分析</span>
+      <button class="close-analysis-btn">关闭</button>
+    </div>
+    <div class="analysis-content">
+      <div class="analysis-text"></div>
+    </div>
+  `;
+
+  // 添加关闭按钮事件
+  container.querySelector('.close-analysis-btn').addEventListener('click', () => {
+    container.classList.add('hidden');
+  });
+
+  document.body.appendChild(container);
+  return container;
+}
+
+// 获取或创建固定结果容器
+let fixedContainer = null;
+function getFixedContainer() {
+  if (!fixedContainer) {
+    fixedContainer = createFixedContainer();
+  }
+  return fixedContainer;
+}
+
 // 使用 MutationObserver 监听微博内容变化
 const observer = new MutationObserver((mutations) => {
   mutations.forEach((mutation) => {
@@ -23,22 +55,10 @@ function injectAnalysisButtons(container) {
     const contentText = post.querySelector('.detail_wbtext_4CRf9')?.innerText || '';
     console.log('[Weibo Reader] Found post content:', contentText.slice(0, 50) + '...');
 
-    const metrics = {
-      reposts: post.querySelector('.woo-font--retweet')?.closest('.toolbar_wrap_np6Ug')?.querySelector('.toolbar_num_JXZul')?.innerText.trim() || '0',
-      comments: post.querySelector('.woo-font--comment')?.closest('.toolbar_wrap_np6Ug')?.querySelector('.toolbar_num_JXZul')?.innerText.trim() || '0',
-      likes: post.querySelector('.woo-like-count')?.innerText.trim() || '0'
-    };
-    console.log('[Weibo Reader] Extracted metrics:', metrics);
-
     // 创建分析按钮
     const button = document.createElement('button');
     button.className = 'weibo-analysis-btn';
     button.innerText = '分析';
-
-    // 创建结果容器
-    const resultContainer = document.createElement('div');
-    resultContainer.className = 'weibo-analysis-result';
-    resultContainer.style.display = 'none';
 
     // 添加点击事件
     button.addEventListener('click', async () => {
@@ -46,25 +66,26 @@ function injectAnalysisButtons(container) {
         button.disabled = true;
         button.innerText = '分析中...';
 
-        // 获取微博文本
-        const content = contentText;
+        // 获取固定容器
+        const container = getFixedContainer();
+        const contentDiv = container.querySelector('.analysis-text');
 
         // 从storage获取设置
         const settings = await chrome.storage.local.get(['promptTemplate']);
         const prompt = (settings.promptTemplate || '请分析这条微博的事实和观点');
-        console.log('[Weibo Reader] Analyzing post content:', content);
+        console.log('[Weibo Reader] Analyzing post content:', contentText);
         console.log('[Weibo Reader] Analyzing post with prompt:', prompt);
 
         // 发送消息给background script处理API调用
         console.log('[Content] 发送分析请求给background:', {
           type: 'analyzeWeibo',
-          contentLength: content?.length,
+          contentLength: contentText?.length,
           prompt
         });
 
         const response = await chrome.runtime.sendMessage({
           type: 'analyzeWeibo',
-          content,
+          content: contentText,
           prompt
         }).catch(error => {
           console.error('[Content] 发送消息失败:', error);
@@ -79,31 +100,26 @@ function injectAnalysisButtons(container) {
         }
 
         // 显示结果
-        resultContainer.innerHTML = `
-          <div class="analysis-content">
-            <div class="analysis-text">
-              ${response.result.replace(/\n/g, '<br>')}
-            </div>
-          </div>
-        `;
-        resultContainer.style.display = 'block';
+        contentDiv.innerHTML = response.result.replace(/\n/g, '<br>');
+        container.classList.remove('hidden');
         console.log('[Weibo Reader] Analysis completed and displayed');
 
       } catch (error) {
         console.error('[Weibo Reader] Analysis failed:', error);
-        resultContainer.innerHTML = `
+        const container = getFixedContainer();
+        container.querySelector('.analysis-text').innerHTML = `
           <div class="analysis-error">
             分析失败: ${error.message}
           </div>
         `;
-        resultContainer.style.display = 'block';
+        container.classList.remove('hidden');
       } finally {
         button.disabled = false;
         button.innerText = '分析';
       }
     });
 
-    // 插入按钮和结果容器
+    // 插入按钮
     const footer = post.querySelector('footer');
     if (footer) {
       const toolbarLeft = footer.querySelector('.toolbar_left_2vlsY');
@@ -112,8 +128,7 @@ function injectAnalysisButtons(container) {
         buttonWrapper.className = 'woo-box-item-flex toolbar_item_1ky_D';
         buttonWrapper.appendChild(button);
         toolbarLeft.appendChild(buttonWrapper);
-        footer.appendChild(resultContainer);
-        console.log('[Weibo Reader] Successfully injected analysis button and container');
+        console.log('[Weibo Reader] Successfully injected analysis button');
       } else {
         console.warn('[Weibo Reader] Could not find toolbar_left_2vlsY');
       }
