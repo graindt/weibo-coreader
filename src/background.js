@@ -1,6 +1,17 @@
 // Ollama API配置
 const API_ENDPOINT = 'http://localhost:11434/api/generate';
 
+// 跟踪当前分析请求
+let currentAnalysis = null;
+
+// 取消当前分析
+async function cancelCurrentAnalysis() {
+  if (currentAnalysis) {
+    await currentAnalysis.controller.abort();
+    currentAnalysis = null;
+  }
+}
+
 // 处理来自content script的消息
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
   console.log('[Background] 收到消息:', request);
@@ -10,7 +21,15 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     return false;
   }
 
-  if (request.type === 'analyzeWeibo') {
+  if (request.type === 'cancelAnalysis') {
+    console.log('[Background] 收到取消分析请求');
+    // 使用Promise处理异步操作
+    new Promise(async () => {
+      await cancelCurrentAnalysis();
+      sendResponse({ success: true });
+    });
+    return true;
+  } else if (request.type === 'analyzeWeibo') {
     console.log('[Background] 开始处理分析请求, sender:', sender);
     handleAnalysis({ ...request, tabId: sender.tab.id })
       .then(result => {
@@ -31,6 +50,13 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
 // 处理微博分析请求
 async function handleAnalysis(request) {
   const { content, prompt, tabId } = request;
+
+  // 如果有正在进行的分析，先取消它
+  await cancelCurrentAnalysis();
+
+  // 创建新的 AbortController
+  const controller = new AbortController();
+  currentAnalysis = { controller, tabId };
   console.log('[Background] 分析内容:', content?.slice(0, 100) + '...');
   console.log('[Background] 使用提示词:', prompt);
   console.log('[Background] Tab ID:', tabId);
@@ -65,7 +91,8 @@ async function handleAnalysis(request) {
         'Access-Control-Allow-Methods': 'POST',
         'Access-Control-Allow-Headers': 'Content-Type'
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify(requestBody),
+      signal: controller.signal
     });
 
     console.log('[Background] API响应状态:', response.status, response.statusText);
@@ -81,6 +108,11 @@ async function handleAnalysis(request) {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
+
+        // 如果请求被取消，跳出循环
+        if (controller.signal.aborted) {
+          throw new Error('分析已取消');
+        }
 
         // 将 Uint8Array 转换为文本
         const text = new TextDecoder().decode(value);
@@ -112,12 +144,21 @@ async function handleAnalysis(request) {
       response: fullResponse
     };
 
-  } catch (error) {
-    console.error('[Background] API请求失败:', {
-      name: error.name,
-      message: error.message,
-      stack: error.stack
-    });
-    throw new Error(error.message || '分析请求失败');
-  }
+    } catch (error) {
+      console.error('[Background] API请求失败:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
+      // 如果是取消请求导致的错误，返回特定消息
+      if (error.name === 'AbortError' || error.message === '分析已取消') {
+        throw new Error('分析已取消');
+      }
+      throw new Error(error.message || '分析请求失败');
+    } finally {
+      // 清理当前分析状态
+      if (currentAnalysis?.controller === controller) {
+        currentAnalysis = null;
+      }
+    }
 }

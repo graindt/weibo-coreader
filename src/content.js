@@ -158,6 +158,19 @@ function injectAnalysisButtons(container) {
 
     // 添加点击事件
     button.addEventListener('click', async () => {
+      // 检查按钮状态判断是否正在分析
+      if (button.innerText === '分析中...') {
+        // 取消当前分析
+        try {
+          await chrome.runtime.sendMessage({ type: 'cancelAnalysis' });
+          button.disabled = false;
+          button.innerText = '分析';
+          return;
+        } catch (error) {
+          console.error('[Weibo Reader] Failed to cancel analysis:', error);
+        }
+      }
+
       try {
         button.disabled = true;
         button.innerText = '分析中...';
@@ -165,6 +178,9 @@ function injectAnalysisButtons(container) {
         // 获取固定容器
         const container = getFixedContainer();
         const contentDiv = container.querySelector('.analysis-text');
+
+        // 清空结果容器
+        contentDiv.innerHTML = '';
 
         // 获取完整微博内容的函数
         async function getFullContent(container) {
