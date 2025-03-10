@@ -1,3 +1,5 @@
+import { logger } from './utils/logger.js';
+
 // Ollama API配置
 const API_ENDPOINT = 'http://localhost:11434/api/generate';
 
@@ -14,15 +16,15 @@ async function cancelCurrentAnalysis() {
 
 // 处理来自content script的消息
 chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
-  console.log('[Background] 收到消息:', request);
-  if (!request || !request.type) {
-    console.error('[Background] Invalid message received:', request);
+  logger.info('收到消息:', request);
+if (!request || !request.type) {
+    logger.error('Invalid message received:', request);
     sendResponse({ error: 'Invalid message format' });
     return false;
   }
 
   if (request.type === 'cancelAnalysis') {
-    console.log('[Background] 收到取消分析请求');
+    logger.info('收到取消分析请求');
     // 使用Promise处理异步操作
     new Promise(async () => {
       await cancelCurrentAnalysis();
@@ -30,14 +32,14 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
     });
     return true;
   } else if (request.type === 'analyzeWeibo') {
-    console.log('[Background] 开始处理分析请求, sender:', sender);
+    logger.info('开始处理分析请求, sender:', sender);
     handleAnalysis({ ...request, tabId: sender.tab.id })
       .then(result => {
-        console.log('[Background] 分析完成:', result);
+        logger.info('分析完成:', result);
         sendResponse({ result: result.response });
       })
       .catch(error => {
-        console.error('[Background] 分析失败:', error);
+        logger.error('分析失败:', error);
         sendResponse({
           result: `分析失败: ${error.message}`,
           error: error.message
@@ -57,18 +59,18 @@ async function handleAnalysis(request) {
   // 创建新的 AbortController
   const controller = new AbortController();
   currentAnalysis = { controller, tabId };
-  console.log('[Background] 分析内容:', content?.slice(0, 100) + '...');
-  console.log('[Background] 使用提示词:', prompt);
-  console.log('[Background] Tab ID:', tabId);
+  logger.info('分析内容:', content?.slice(0, 100) + '...');
+  logger.info('使用提示词:', prompt);
+  logger.info('Tab ID:', tabId);
 
   if (!content) {
-    console.error('[Background] 错误: 未能获取微博内容');
+    logger.error('错误: 未能获取微博内容');
     throw new Error('未能获取微博内容');
   }
 
   // 获取用户选择的模型
   const { modelName = 'gemma2:2b' } = await chrome.storage.local.get(['modelName']);
-  console.log('[Background] 使用模型:', modelName);
+  logger.info('使用模型:', modelName);
 
   try {
     const requestBody = {
@@ -76,13 +78,13 @@ async function handleAnalysis(request) {
       prompt: `${prompt}\n\n微博内容如下: ${content}`,
       stream: true
     };
-    console.log('[Background] 发送API请求:', {
+    logger.info('发送API请求:', {
       endpoint: API_ENDPOINT,
       model: requestBody.model,
       promptLength: requestBody.prompt.length
     });
 
-    console.log('[Background] 尝试连接Ollama服务器...');
+    logger.info('尝试连接Ollama服务器...');
     const response = await fetch(API_ENDPOINT, {
       method: 'POST',
       headers: {
@@ -95,7 +97,7 @@ async function handleAnalysis(request) {
       signal: controller.signal
     });
 
-    console.log('[Background] API响应状态:', response.status, response.statusText);
+    logger.info('API响应状态:', response.status, response.statusText);
 
     if (!response.ok) {
       throw new Error('API请求失败: ' + response.statusText);
@@ -131,7 +133,7 @@ async function handleAnalysis(request) {
                 });
               }
             } catch (e) {
-              console.warn('[Background] 解析流数据失败:', e);
+              logger.warn('解析流数据失败:', e);
             }
           }
         }
@@ -145,7 +147,7 @@ async function handleAnalysis(request) {
     };
 
     } catch (error) {
-      console.error('[Background] API请求失败:', {
+      logger.error('API请求失败:', {
         name: error.name,
         message: error.message,
         stack: error.stack

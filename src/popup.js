@@ -1,10 +1,24 @@
-document.addEventListener('DOMContentLoaded', async () => {
-  const modelNameSelect = document.getElementById('modelName');
-  const promptTemplateInput = document.getElementById('promptTemplate');
-  const saveBtn = document.getElementById('saveBtn');
-  const statusDiv = document.getElementById('status');
+// Initialize the popup with the logger
+async function initializePopup() {
+  try {
+    const { logger } = await import(chrome.runtime.getURL('utils/logger.js'));
+    const modelNameSelect = document.getElementById('modelName');
+    const promptTemplateInput = document.getElementById('promptTemplate');
+    const saveBtn = document.getElementById('saveBtn');
+    const statusDiv = document.getElementById('status');
 
-  // 从Ollama API获取可用模型
+    // 显示状态信息
+    function showStatus(type, message) {
+      statusDiv.textContent = message;
+      statusDiv.className = `status ${type}`;
+      statusDiv.style.display = 'block';
+
+      setTimeout(() => {
+        statusDiv.style.display = 'none';
+      }, 3000);
+    }
+
+    // 从Ollama API获取可用模型
   async function fetchOllamaModels() {
     try {
       const response = await fetch('http://localhost:11434/api/tags');
@@ -14,7 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const data = await response.json();
       return data.models || [];
     } catch (error) {
-      console.error('Error fetching models:', error);
+      logger.error('Error fetching models:', error);
       showStatus('error', 'Failed to fetch models: ' + error.message);
       return [];
     }
@@ -45,7 +59,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
       }
     } catch (error) {
-      console.error('Error updating model select:', error);
+      logger.error('Error updating model select:', error);
       const option = new Option('Error loading models', '', true, true);
       modelNameSelect.add(option);
       showStatus('error', 'Failed to load models');
@@ -54,41 +68,40 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
-  // 初始化加载
-  await updateModelSelect();
-  chrome.storage.local.get(['modelName', 'promptTemplate'], (result) => {
-    if (result.modelName) {
-      modelNameSelect.value = result.modelName;
-    }
-    if (result.promptTemplate) {
-      promptTemplateInput.value = result.promptTemplate;
-    }
-  });
-
-  // 保存设置
-  saveBtn.addEventListener('click', async () => {
-    const modelName = modelNameSelect.value;
-    const promptTemplate = promptTemplateInput.value.trim();
-
-    try {
-      await chrome.storage.local.set({
-        modelName,
-        promptTemplate: promptTemplate || '请分析这条微博事实和观点，并给出3个关键点'
+    // 初始化加载
+    await updateModelSelect();
+    await new Promise(resolve => {
+      chrome.storage.local.get(['modelName', 'promptTemplate'], (result) => {
+        if (result.modelName) {
+          modelNameSelect.value = result.modelName;
+        }
+        if (result.promptTemplate) {
+          promptTemplateInput.value = result.promptTemplate;
+        }
+        resolve();
       });
-      showStatus('success', '设置已保存');
-    } catch (error) {
-      showStatus('error', '保存失败: ' + error.message);
-    }
-  });
+    });
 
-  // 显示状态信息
-  function showStatus(type, message) {
-    statusDiv.textContent = message;
-    statusDiv.className = `status ${type}`;
-    statusDiv.style.display = 'block';
+    // 保存设置
+    saveBtn.addEventListener('click', async () => {
+      const modelName = modelNameSelect.value;
+      const promptTemplate = promptTemplateInput.value.trim();
 
-    setTimeout(() => {
-      statusDiv.style.display = 'none';
-    }, 3000);
+      try {
+        await chrome.storage.local.set({
+          modelName,
+          promptTemplate: promptTemplate || '请分析这条微博事实和观点，并给出3个关键点'
+        });
+        showStatus('success', '设置已保存');
+      } catch (error) {
+        showStatus('error', '保存失败: ' + error.message);
+      }
+    });
+
+  } catch (error) {
+    console.error('[Weibo Reader] Failed to initialize popup:', error);
   }
-});
+}
+
+// Start initialization when DOM is ready
+document.addEventListener('DOMContentLoaded', initializePopup);

@@ -1,5 +1,10 @@
-// 创建固定结果容器
-function createFixedContainer() {
+// Initialize the extension
+async function initializeExtension() {
+  // Dynamically import logger
+  const { logger } = await import(chrome.runtime.getURL('utils/logger.js'));
+
+  // 创建固定结果容器
+  function createFixedContainer() {
   const container = document.createElement('div');
   container.className = 'fixed-analysis-container hidden';
   container.innerHTML = `
@@ -125,7 +130,7 @@ function injectAnalysisButtons(container) {
   // 去重
   posts = Array.from(new Set(posts));
 
-  console.log('[Weibo Reader] Found posts:', posts.length);
+  logger.info('Found posts:', posts.length);
 
   posts.forEach(async (post) => {
     // 标记已处理
@@ -149,7 +154,7 @@ function injectAnalysisButtons(container) {
       `转发内容：\n${originalContent}\n\n原微博内容：\n${retweetContent}` :
       originalContent;
 
-    console.log('[Weibo Reader] Found post content:', contentText.slice(0, 50) + '...');
+    logger.info('Found post content:', contentText.slice(0, 50) + '...');
 
     // 创建分析按钮
     const button = document.createElement('button');
@@ -167,7 +172,7 @@ function injectAnalysisButtons(container) {
           button.innerText = '分析';
           return;
         } catch (error) {
-          console.error('[Weibo Reader] Failed to cancel analysis:', error);
+          logger.error('Failed to cancel analysis:', error);
         }
       }
 
@@ -213,11 +218,11 @@ function injectAnalysisButtons(container) {
             prompt = settings.promptTemplate;
           }
         } catch (error) {
-          console.warn('[Weibo Reader] Failed to get settings:', error);
+          logger.warn('Failed to get settings:', error);
           // 继续使用默认prompt
         }
-        console.log('[Weibo Reader] Analyzing post content:', contentText);
-        console.log('[Weibo Reader] Analyzing post with prompt:', prompt);
+        logger.info('Analyzing post content:', contentText);
+        logger.info('Analyzing post with prompt:', prompt);
 
         // 清空并显示结果容器
         contentDiv.innerHTML = '';
@@ -236,7 +241,7 @@ function injectAnalysisButtons(container) {
         chrome.runtime.onMessage.addListener(streamListener);
 
         // 发送消息给background script处理API调用
-        console.log('[Content] 发送分析请求给background:', {
+        logger.info('发送分析请求给background:', {
           type: 'analyzeWeibo',
           contentLength: contentText?.length,
           prompt
@@ -249,20 +254,20 @@ function injectAnalysisButtons(container) {
             prompt
           });
 
-          console.log('[Content] 收到background最终响应:', response);
+          logger.info('收到background最终响应:', response);
 
           if (!response || !response.result) {
             throw new Error('无效的分析结果');
           }
 
-          console.log('[Weibo Reader] Analysis completed');
+          logger.info('Analysis completed');
         } finally {
           // 移除消息监听
           chrome.runtime.onMessage.removeListener(streamListener);
         }
 
       } catch (error) {
-        console.error('[Weibo Reader] Analysis failed:', error);
+        logger.error('Analysis failed:', error);
         const container = getFixedContainer();
         container.querySelector('.analysis-text').innerHTML = `
           <div class="analysis-error">
@@ -299,12 +304,12 @@ function injectAnalysisButtons(container) {
         } else {
           toolbar.appendChild(buttonWrapper);
         }
-        console.log('[Weibo Reader] Successfully injected analysis button');
+        logger.info('Successfully injected analysis button');
       } else {
-        console.warn('[Weibo Reader] Could not find toolbar');
+        logger.warn('Could not find toolbar');
       }
     } else {
-      console.warn('[Weibo Reader] Could not find footer');
+      logger.warn('Could not find footer');
     }
   });
 }
@@ -320,15 +325,21 @@ function startObserver() {
   });
 }
 
-// 初始启动
-startObserver();
-// 初始处理现有内容
-injectAnalysisButtons(document.body);
+  // 初始启动
+  startObserver();
+  // 初始处理现有内容
+  injectAnalysisButtons(document.body);
 
-// 页面切换时重新初始化
-window.addEventListener('popstate', () => {
-  setTimeout(() => {
-    startObserver();
-    injectAnalysisButtons(document.body);
-  }, 500);
+  // 页面切换时重新初始化
+  window.addEventListener('popstate', () => {
+    setTimeout(() => {
+      startObserver();
+      injectAnalysisButtons(document.body);
+    }, 500);
+  });
+}
+
+// Start the extension
+initializeExtension().catch(error => {
+  console.error('[Weibo Reader] Failed to initialize:', error);
 });
