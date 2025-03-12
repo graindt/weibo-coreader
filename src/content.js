@@ -257,7 +257,7 @@ function injectAnalysisButtons(container) {
 
           logger.info('收到background最终响应:', response);
 
-          if (response.error) {
+          if (response && response.error) {
             throw new Error(response.error);
           }
 
