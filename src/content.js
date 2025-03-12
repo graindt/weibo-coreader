@@ -35,19 +35,6 @@ function getFixedContainer() {
   return fixedContainer;
 }
 
-// 防抖函数
-function debounce(func, wait) {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
-}
-
 // 检查节点是否为微博内容或包含微博内容
 function isRelevantNode(node) {
   // 检查节点类型
@@ -181,10 +168,13 @@ function injectAnalysisButtons(container) {
         button.disabled = true;
         button.innerText = '分析中...';
 
-        // 获取并显示固定容器，立即显示加载状态
+        // 获取固定容器并清空之前的内容
         const container = getFixedContainer();
         container.classList.remove('hidden');
         const contentDiv = container.querySelector('.analysis-text');
+        // 清空之前的内容（包括可能存在的错误信息）
+        contentDiv.innerHTML = '';
+        // 显示加载状态
         contentDiv.innerHTML = '<div style="color: #666;">正在分析中，请稍候...</div>';
 
         // 获取完整微博内容的函数
