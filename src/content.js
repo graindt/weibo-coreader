@@ -177,15 +177,15 @@ function injectAnalysisButtons(container) {
       }
 
       try {
+        // 立即更新按钮状态和显示分析容器
         button.disabled = true;
         button.innerText = '分析中...';
 
-        // 获取固定容器
+        // 获取并显示固定容器，立即显示加载状态
         const container = getFixedContainer();
+        container.classList.remove('hidden');
         const contentDiv = container.querySelector('.analysis-text');
-
-        // 清空结果容器
-        contentDiv.innerHTML = '';
+        contentDiv.innerHTML = '<div style="color: #666;">正在分析中，请稍候...</div>';
 
         // 获取完整微博内容的函数
         async function getFullContent(container) {
@@ -224,14 +224,16 @@ function injectAnalysisButtons(container) {
         logger.info('Analyzing post content:', contentText);
         logger.info('Analyzing post with prompt:', prompt);
 
-        // 清空并显示结果容器
-        contentDiv.innerHTML = '';
-        container.classList.remove('hidden');
-
         // 设置流式响应监听器
+        let isFirstResponse = true;
         const streamListener = (message) => {
           logger.info('Received message:', message);
           if (message.type === 'streamResponse') {
+            if (isFirstResponse) {
+              // 清空"正在分析中"的提示
+              contentDiv.innerHTML = '';
+              isFirstResponse = false;
+            }
             contentDiv.innerHTML += message.content.replace(/\n/g, '<br>');
             // 自动滚动到底部
             contentDiv.scrollTop = contentDiv.scrollHeight;
