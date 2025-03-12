@@ -1,7 +1,8 @@
 import { logger } from './utils/logger.js';
 
 // Ollama API配置
-const API_ENDPOINT = 'http://localhost:11434/api/generate';
+const OLLAMA_BASE_URL = 'http://localhost:11434';
+const API_ENDPOINT = OLLAMA_BASE_URL + '/api/generate';
 
 // 跟踪当前分析请求
 let currentAnalysis = null;
@@ -49,9 +50,27 @@ if (!request || !request.type) {
   }
 });
 
+// 检查Ollama是否可访问
+async function checkOllamaAvailability() {
+  try {
+    const response = await fetch(OLLAMA_BASE_URL + '/api/version', {
+      method: 'GET'
+    });
+    return response.ok;
+  } catch (error) {
+    return false;
+  }
+}
+
 // 处理微博分析请求
 async function handleAnalysis(request) {
   const { content, prompt, tabId } = request;
+
+  // 首先检查Ollama是否可用
+  const isOllamaAvailable = await checkOllamaAvailability();
+  if (!isOllamaAvailable) {
+    throw new Error('无法连接到Ollama服务。请确保已安装Ollama并且正在运行。\n\n安装说明请访问: https://ollama.ai');
+  }
 
   // 如果有正在进行的分析，先取消它
   await cancelCurrentAnalysis();

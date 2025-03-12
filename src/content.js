@@ -230,6 +230,7 @@ function injectAnalysisButtons(container) {
 
         // 设置流式响应监听器
         const streamListener = (message) => {
+          logger.info('Received message:', message);
           if (message.type === 'streamResponse') {
             contentDiv.innerHTML += message.content.replace(/\n/g, '<br>');
             // 自动滚动到底部
@@ -255,6 +256,10 @@ function injectAnalysisButtons(container) {
           });
 
           logger.info('收到background最终响应:', response);
+
+          if (response.error) {
+            throw new Error(response.error);
+          }
 
           if (!response || !response.result) {
             throw new Error('无效的分析结果');
